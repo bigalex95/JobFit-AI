@@ -24,6 +24,13 @@ Powered by **Google Gemini** and modern NLP.
 | 🌐 **Web UI**                   | Streamlit frontend + FastAPI backend                |
 | 🐳 **Docker Ready**             | Containerized for easy deployment                   |
 
+### 🔤 AI Bullet Rewriter
+
+- Paste any bullet from your resume
+- Get an ATS-optimized, keyword-rich version
+- Powered by Gemini 2.5 Flash
+- Context-aware: uses job description and your resume
+
 ---
 
 ## 🛠️ Tech Stack
