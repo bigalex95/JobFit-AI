@@ -1,0 +1,16 @@
+# Core
+fastapi
+uvicorn
+pydantic
+streamlit
+python-multipart
+pdfplumber
+pymupdf                  # aka fitz (better than PyPDF2)
+spacy
+torch
+transformers
+sentence-transformers
+numpy
+pandas
+scikit-learn
+google-generativeai      # for Gemini API (optional)

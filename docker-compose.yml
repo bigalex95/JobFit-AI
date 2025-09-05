@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./jobfit-ai/backend:/app/backend
+      - ./jobfit-ai/data:/app/data
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    command: streamlit run frontend/app.py --server.port 8501
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./jobfit-ai/frontend:/app/frontend
+      - ./jobfit-ai/data:/app/data
