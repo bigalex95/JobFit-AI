@@ -1,21 +1,23 @@
 import sys
 import os
-
-# Add the current directory (backend/) to sys.path so imports work
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Annotated
+import json
 
-# Now these will work:
+# Add backend/ to path so imports work
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import LLM-based modules
 from utils.pdf_parser import extract_text_from_pdf
-from utils.jd_parser import parse_job_description
-from utils.matcher import calculate_skill_match, estimate_experience
-from utils.ai_suggestions import generate_resume_suggestions
+from utils.llm_resume_parser import parse_resume_with_llm
+from utils.llm_jd_parser import parse_jd_with_llm
+from utils.llm_matcher import run_llm_match
 
-app = FastAPI(title="JobFit AI Backend")
+# Initialize FastAPI
+app = FastAPI(title="JobFit AI - LLM Enhanced Backend")
 
+# Allow frontend (Streamlit) to communicate
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,17 +25,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.post("/parse-jd")
-async def parse_jd(text: Annotated[str, Form()]):
-    result = parse_job_description(text)
-    return result
+# Ensure data/resumes exists
+os.makedirs("data/resumes", exist_ok=True)
 
 
 @app.post("/parse-resume")
-async def parse_resume(file: UploadFile = File(...)):
+async def api_parse_resume(file: UploadFile = File(...)):
     filepath = f"data/resumes/{file.filename}"
-    os.makedirs("data/resumes", exist_ok=True)
     with open(filepath, "wb") as f:
         f.write(await file.read())
 
@@ -41,39 +39,76 @@ async def parse_resume(file: UploadFile = File(...)):
     return {"text": text[:1000], "full_text": text}
 
 
+@app.post("/parse-jd")
+async def api_parse_jd(text: Annotated[str, Form()]):
+    return {"raw_text": text}
+
+
 @app.post("/match")
 async def match(jd_text: Annotated[str, Form()], resume_file: UploadFile = File(...)):
-    # Parse JD
-    jd_data = parse_job_description(jd_text)
-
-    # Save and parse resume
-    os.makedirs("data/resumes", exist_ok=True)
+    # --- 1. Save & Extract Resume Text ---
     resume_path = f"data/resumes/{resume_file.filename}"
     with open(resume_path, "wb") as f:
         f.write(await resume_file.read())
 
     resume_text = extract_text_from_pdf(resume_path)
 
-    # Match skills
-    skill_match = calculate_skill_match(resume_text, jd_data["skills_required"])
-    exp_match = estimate_experience(resume_text, jd_data["experience_required"])
+    # --- 2. Parse Resume with LLM ---
+    parsed_resume = parse_resume_with_llm(resume_text)
+    if not parsed_resume["success"]:
+        return {
+            "error": "Failed to parse resume with LLM",
+            "details": parsed_resume["error"],
+            "raw_output": parsed_resume.get("raw_output", ""),
+        }
 
-    # Generate AI Suggestions
-    ai_suggestions = generate_resume_suggestions(
-        jd_text=jd_text,
-        resume_text=resume_text,
-        missing_skills=skill_match["missing_skills"],
-        experience_gap=exp_match,
+    # --- 3. Parse Job Description with LLM ---
+    parsed_jd = parse_jd_with_llm(jd_text)
+    if not parsed_jd["success"]:
+        return {
+            "error": "Failed to parse job description with LLM",
+            "details": parsed_jd["error"],
+            "raw_output": parsed_jd.get("raw_output", ""),
+        }
+
+    # --- 4. Run Semantic Match with LLM ---
+    match_result = run_llm_match(parsed_resume["data"], parsed_jd["data"])
+    if not match_result["success"]:
+        return {
+            "error": "Failed to generate match feedback",
+            "details": match_result["error"],
+        }
+
+    # --- 5. Estimate Match Score (Simple Heuristic) ---
+    # You can improve this later with more logic
+    required_skills_count = (
+        len(parsed_jd["data"].get("required_skills", {}).get("ml_frameworks", []))
+        + len(parsed_jd["data"].get("required_skills", {}).get("languages", []))
+        + len(parsed_jd["data"].get("required_skills", {}).get("cloud", []))
     )
 
+    # Very basic: if feedback says "missing", count them
+    missing_count = (
+        match_result["feedback"].lower().count("missing")
+        if "missing" in match_result["feedback"].lower()
+        else 0
+    )
+    match_percentage = max(0, 100 - (missing_count * 10))  # rough estimate
+
+    if parsed_resume["data"]["years_of_experience"] < parsed_jd["data"].get(
+        "required_years", 0
+    ):
+        match_percentage = max(0, match_percentage - 20)
+
+    # --- 6. Return Structured Response ---
     return {
-        "job_summary": jd_data,
-        "skill_match": skill_match,
-        "experience_match": exp_match,
-        "ai_suggestions": ai_suggestions,
-        "overall_score": (
-            skill_match["match_percentage"]
-            + (50 if exp_match["meets_requirement"] else 0)
-        )
-        // 2,
+        "job_summary": {
+            "job_title": parsed_jd["data"].get("job_title"),
+            "required_years": parsed_jd["data"].get("required_years"),
+            "required_education": parsed_jd["data"].get("required_education"),
+            "required_skills": parsed_jd["data"].get("required_skills"),
+        },
+        "parsed_resume": parsed_resume["data"],
+        "ai_feedback": match_result["feedback"],
+        "overall_score": match_percentage,
     }

@@ -1,3 +1,5 @@
+# frontend/app.py
+
 import streamlit as st
 import requests
 
@@ -15,7 +17,9 @@ if st.button("Analyze Fit"):
     if not jd_text or not resume_file:
         st.error("Please provide both job description and resume.")
     else:
-        with st.spinner("Analyzing..."):
+        with st.spinner("🔍 Analyzing with AI..."):
+
+            # Call FastAPI
             response = requests.post(
                 "http://127.0.0.1:8000/match",
                 data={"jd_text": jd_text},
@@ -31,57 +35,72 @@ if st.button("Analyze Fit"):
         if response.status_code == 200:
             result = response.json()
 
-            st.success(f"Match Score: {result['overall_score']}%")
+            # Show error if LLM parsing failed
+            if "error" in result:
+                st.error(f"AI Parsing Failed: {result['error']}")
+                st.code(result.get("raw_output", "")[:1000])
+                st.stop()
 
-            # Missing Skills
-            missing = result["skill_match"]["missing_skills"]
-            if missing:
-                st.warning("⚠️ Missing Skills:")
-                for s in missing:
-                    st.markdown(f"- **{s['skill']}** (relevance: {s['match_score']})")
-            else:
-                st.success("✅ All required skills are covered!")
+            # ✅ Match Score
+            score = result.get("overall_score", 0)
+            st.success(f"✅ Match Score: **{score}%**")
 
-            # Experience Match
-            exp = result["experience_match"]
-            required_years = exp.get("required_years", 0)
+            # 📊 Parsed Experience Check
+            parsed_resume = result.get("parsed_resume", {})
+            job_summary = result.get("job_summary", {})
 
-            if exp["meets_requirement"] and required_years > 0:
-                st.success(
-                    f"✅ Experience: You have {exp['resume_years']}, required {required_years}+ years"
-                )
-            elif required_years > 0:
-                st.error(
-                    f"❌ You have {exp['resume_years']}, but job requires {required_years}+ years"
-                )
-            else:
-                st.warning(
-                    "⚠️ Could not detect required experience from job description."
-                )
+            years_exp = parsed_resume.get("years_of_experience", "Unknown")
+            req_years = job_summary.get("required_years", "Not specified")
 
-            # AI Suggestions
-            if "ai_suggestions" in result:
-                st.subheader("🧠 AI-Powered Suggestions")
-
-                # Clean up bullet points
-                suggestions = result["ai_suggestions"]
-                for line in suggestions.split("\n"):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    # Fix common OCR/case issues
-                    line = line.replace("DeveLoped", "Developed").replace(
-                        "Doveloped", "Developed"
+            if isinstance(req_years, (int, float)) and isinstance(
+                years_exp, (int, float)
+            ):
+                if years_exp >= req_years:
+                    st.success(
+                        f"✅ Experience: You have **{years_exp}+ years**, meets requirement of {req_years}+ years"
                     )
-                    line = line.replace("Leaming", "Learning").replace("Ml", "ML")
-                    if line.startswith("•") or line[0].isdigit():
-                        st.markdown(f"- {line}")
+                else:
+                    st.warning(
+                        f"⚠️ Experience: You have **{years_exp} years**, but job requires **{req_years}+ years**"
+                    )
+            else:
+                st.info("📊 Experience: Could not determine exact years.")
 
-            # Suggestions
-            st.subheader("📌 Suggestions")
-            if missing:
-                st.markdown("Add these skills to your resume:")
-                for m in missing:
-                    st.code(f"• Developed ML solutions using {m['skill']}.")
+            # 💬 AI Feedback (Gaps & Suggestions)
+            feedback = result.get("ai_feedback", "")
+            st.subheader("🧠 AI-Powered Feedback")
+
+            for line in feedback.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                # Fix common rendering issues
+                line = (
+                    line.replace("Doveloped", "Developed")
+                    .replace("DeveLoped", "Developed")
+                    .replace("Leaming", "Learning")
+                    .replace("Ml", "ML")
+                    .replace("Nlp", "NLP")
+                    .replace("Mlops", "MLOps")
+                )
+
+                if (
+                    line.startswith("1.")
+                    or line.startswith("2.")
+                    or line.startswith("3.")
+                    or line.startswith("4.")
+                ):
+                    st.markdown(f"**{line}**")
+                elif line.startswith("•") or line[0].isdigit():
+                    st.markdown(f"- {line}")
+
+            # 📥 Optional: Show raw parsed data (for debugging)
+            with st.expander("📄 View Parsed Resume (Debug)"):
+                st.json(parsed_resume)
+
+            with st.expander("📋 View Job Requirements (Debug)"):
+                st.json(job_summary)
+
         else:
-            st.error("Analysis failed.")
+            st.error("❌ Analysis failed.")
+            st.code(response.text)
