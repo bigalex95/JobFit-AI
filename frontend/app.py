@@ -132,7 +132,7 @@ if st.session_state.result:
                 if not feedback_text:
                     st.warning("⚠️ AI feedback is empty.")
                 else:
-                    # Clean common OCR/capitalization issues
+                    # Clean common issues
                     feedback_text = (
                         feedback_text.replace("Doveloped", "Developed")
                         .replace("DeveLoped", "Developed")
@@ -157,30 +157,32 @@ if st.session_state.result:
                 st.info("🔍 Feedback received in structured format.")
 
                 # Extract missing skills
-                missing_skills = raw_feedback.get("missing_required_skills", "")
-                if missing_skills:
+                missing = raw_feedback.get("missing_required_skills", "")
+                if missing:
                     st.markdown("### ⚠️ Missing Skills")
-                    st.markdown(f"- {', '.join(missing_skills.split(', '))}")
+                    st.markdown(
+                        f"- {', '.join([s.strip() for s in missing.split(',')])}"
+                    )
 
-                # Extract underemphasized skills
+                # Extract underemphasized
                 underemphasized = raw_feedback.get("underemphasized_skills", "")
                 if underemphasized:
                     st.markdown("### 🔄 Underemphasized Skills")
-                    st.markdown(f"- {', '.join(underemphasized.split(', '))}")
+                    st.markdown(
+                        f"- {', '.join([s.strip() for s in underemphasized.split(',')])}"
+                    )
 
-                # Extract suggested bullets
+                # Extract bullets
                 bullets = raw_feedback.get("suggested_bullet_points", [])
                 if bullets:
                     st.markdown("### ✅ Suggested Bullet Points")
                     for bullet in bullets:
-                        st.markdown(f"- {bullet}")
+                        st.markdown(f"- {bullet.strip()}")
 
-                # Fallback: show full JSON if no keys found
-                if not any([missing_skills, underemphasized, bullets]):
+                if not any([missing, underemphasized, bullets]):
                     st.json(raw_feedback)
-
             else:
-                st.json(raw_feedback)  # fallback for unknown types
+                st.json(raw_feedback)
 
         # Debug: View parsed data
         with st.expander("🔍 View Parsed Resume (Debug)"):

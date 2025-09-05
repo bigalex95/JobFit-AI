@@ -7,29 +7,23 @@ No more guessing — JobFit AI tells you:
 - ✅ Which skills to highlight
 - ⚠️ What’s missing from your resume
 - 💡 How to rephrase bullets for ATS
-- 📊 Your real match score
+- 📊 Your real match score (70–90%, not inflated)
 
-Powered by **Google Gemini** and modern NLP.
+Powered by **Google Gemini 2.5 Flash** and modern NLP.
 
 ---
 
 ## 🚀 Features
 
-| Feature                         | Description                                         |
-| ------------------------------- | --------------------------------------------------- |
-| 📄 **Resume Parsing**           | Extracts skills, experience, education from PDF     |
-| 📋 **Job Description Analysis** | Parses requirements using LLMs                      |
-| 🔍 **Smart Matching**           | Compares resume vs job using semantic understanding |
-| 💬 **AI Suggestions**           | Generates ATS-friendly bullet points to add         |
-| 🌐 **Web UI**                   | Streamlit frontend + FastAPI backend                |
-| 🐳 **Docker Ready**             | Containerized for easy deployment                   |
-
-### 🔤 AI Bullet Rewriter
-
-- Paste any bullet from your resume
-- Get an ATS-optimized, keyword-rich version
-- Powered by Gemini 2.5 Flash
-- Context-aware: uses job description and your resume
+| Feature                         | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
+| 📄 **Resume Parsing**           | Extracts skills, experience, education from PDF using LLMs |
+| 📋 **Job Description Analysis** | Parses requirements with context-aware LLM parsing         |
+| 🔍 **Smart Matching**           | Semantic comparison, not keyword counting                  |
+| 💬 **AI Suggestions**           | Generates ATS-friendly bullet points to add                |
+| 🔤 **AI Bullet Rewriter**       | Improve weak bullets with context-aware rewriting          |
+| 🌐 **Web UI**                   | Streamlit frontend + FastAPI backend                       |
+| 🐳 **Docker Ready**             | Containerized for easy deployment                          |
 
 ---
 
@@ -38,7 +32,7 @@ Powered by **Google Gemini** and modern NLP.
 - **Frontend**: Streamlit (Python)
 - **Backend**: FastAPI
 - **LLM**: Google Gemini 2.5 Flash
-- **Parsing**: `pdfplumber`, `google-generativeai`
+- **PDF Parsing**: `pdfplumber`
 - **DevOps**: Docker, GitHub Actions
 - **Database**: SQLite (MVP), PostgreSQL (future)
 
@@ -93,11 +87,18 @@ streamlit run frontend/app.py
 
 ---
 
+## 🐞 Known Issues
+
+| Issue                                                          | Status            |
+| -------------------------------------------------------------- | ----------------- |
+| 🔢 Match score calculation may not reflect structured feedback | **Next Priority** |
+
+---
+
 ## 🌐 Roadmap
 
 | Feature                     | Status  |
 | --------------------------- | ------- |
-| ✅ LLM-powered parsing      | Done    |
 | 🔤 AI Bullet Rewriter       | Done    |
 | 📤 Export Optimized Resume  | Next    |
 | 🧩 Chrome Extension         | Planned |
