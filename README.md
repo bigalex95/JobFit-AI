@@ -98,7 +98,7 @@ streamlit run frontend/app.py
 | Feature                     | Status  |
 | --------------------------- | ------- |
 | ✅ LLM-powered parsing      | Done    |
-| 🔤 AI Bullet Rewriter       | Next    |
+| 🔤 AI Bullet Rewriter       | Done    |
 | 📤 Export Optimized Resume  | Planned |
 | 🧩 Chrome Extension         | Planned |
 | ☁️ Deploy to Railway/Render | Future  |
