@@ -14,6 +14,7 @@ from utils.llm_resume_parser import parse_resume_with_llm
 from utils.llm_jd_parser import parse_jd_with_llm
 from utils.llm_matcher import run_llm_match
 from utils.bullet_rewriter import rewrite_bullet_point
+from utils.score_calculator import calculate_match_score_from_feedback
 
 # Initialize FastAPI
 app = FastAPI(title="JobFit AI - LLM Enhanced Backend")
@@ -51,7 +52,6 @@ async def match(jd_text: Annotated[str, Form()], resume_file: UploadFile = File(
     resume_path = f"data/resumes/{resume_file.filename}"
     with open(resume_path, "wb") as f:
         f.write(await resume_file.read())
-
     resume_text = extract_text_from_pdf(resume_path)
 
     # --- 2. Parse Resume with LLM ---
@@ -74,34 +74,57 @@ async def match(jd_text: Annotated[str, Form()], resume_file: UploadFile = File(
 
     # --- 4. Run Semantic Match with LLM ---
     match_result = run_llm_match(parsed_resume["data"], parsed_jd["data"])
+
+    # Safely extract feedback (string or structured)
     if not match_result["success"]:
-        return {
-            "error": "Failed to generate match feedback",
-            "details": match_result["error"],
-        }
+        ai_feedback = "Could not generate feedback. Please try again."
+    else:
+        # Ensure ai_feedback is always a string
+        raw_feedback = match_result["feedback"]
+        if isinstance(raw_feedback, str):
+            ai_feedback = raw_feedback.strip()
+        elif isinstance(raw_feedback, dict):
+            # Convert structured feedback to readable string
+            lines = []
+            if raw_feedback.get("experience_met") is not None:
+                status = "Yes" if raw_feedback["experience_met"] else "No"
+                lines.append(
+                    f"1. Does the candidate meet the experience requirement?\n{status}"
+                )
+            if raw_feedback.get("missing_required_skills"):
+                lines.append(
+                    f"2. Missing required skills:\n{raw_feedback['missing_required_skills']}"
+                )
+            if raw_feedback.get("underemphasized_skills"):
+                lines.append(
+                    f"3. Underemphasized skills:\n{raw_feedback['underemphasized_skills']}"
+                )
+            if raw_feedback.get("suggested_bullet_points"):
+                lines.append("4. Suggested bullet points to add:")
+                for bullet in raw_feedback["suggested_bullet_points"]:
+                    lines.append(f"• {bullet}")
+            ai_feedback = "\n\n".join(lines)
+        else:
+            ai_feedback = str(raw_feedback)
 
-    # --- 5. Estimate Match Score (Simple Heuristic) ---
-    # You can improve this later with more logic
-    required_skills_count = (
-        len(parsed_jd["data"].get("required_skills", {}).get("ml_frameworks", []))
-        + len(parsed_jd["data"].get("required_skills", {}).get("languages", []))
-        + len(parsed_jd["data"].get("required_skills", {}).get("cloud", []))
+    # --- 5. Safely Extract Experience Requirement ---
+    required_years_raw = parsed_jd["data"].get("required_years")
+    try:
+        required_years = (
+            int(required_years_raw) if required_years_raw not in [None, ""] else 0
+        )
+    except (ValueError, TypeError):
+        required_years = 0
+
+    actual_experience = parsed_resume["data"]["years_of_experience"]
+    years_match = actual_experience >= required_years if required_years > 0 else True
+
+    # --- 6. Calculate Dynamic Match Score ---
+    overall_score = calculate_match_score_from_feedback(
+        ai_feedback=ai_feedback, years_match=years_match
     )
 
-    # Very basic: if feedback says "missing", count them
-    missing_count = (
-        match_result["feedback"].lower().count("missing")
-        if "missing" in match_result["feedback"].lower()
-        else 0
-    )
-    match_percentage = max(0, 100 - (missing_count * 10))  # rough estimate
-
-    if parsed_resume["data"]["years_of_experience"] < parsed_jd["data"].get(
-        "required_years", 0
-    ):
-        match_percentage = max(0, match_percentage - 20)
-
-    # --- 6. Return Structured Response ---
+    # --- 7. Return Structured Response ---
     return {
         "job_summary": {
             "job_title": parsed_jd["data"].get("job_title"),
@@ -110,8 +133,8 @@ async def match(jd_text: Annotated[str, Form()], resume_file: UploadFile = File(
             "required_skills": parsed_jd["data"].get("required_skills"),
         },
         "parsed_resume": parsed_resume["data"],
-        "ai_feedback": match_result["feedback"],
-        "overall_score": match_percentage,
+        "ai_feedback": ai_feedback,  # ✅ Always a string
+        "overall_score": overall_score,
     }
 
 

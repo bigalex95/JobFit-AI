@@ -68,9 +68,10 @@ if st.button("🔍 Analyze Fit"):
                 )
 
                 if response.status_code == 200:
-                    st.session_state.result = response.json()
+                    result = response.json()
+                    st.session_state.result = result
                     st.success(
-                        f"✅ Analysis complete! Match Score: **{st.session_state.result.get('overall_score', 'N/A')}%**"
+                        f"✅ Analysis complete! Match Score: **{result.get('overall_score', 'N/A')}%**"
                     )
                 else:
                     st.error(f"❌ Analysis failed: {response.status_code}")
@@ -114,31 +115,72 @@ if st.session_state.result:
         else:
             st.info("📊 Experience: Could not determine exact years.")
 
+        # -------------------------------
         # AI Feedback
+        # -------------------------------
         st.subheader("🧠 AI-Powered Feedback")
-        feedback = result.get("ai_feedback", "")
-        for line in feedback.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            # Fix common OCR/capitalization issues
-            line = (
-                line.replace("Doveloped", "Developed")
-                .replace("DeveLoped", "Developed")
-                .replace("Leaming", "Learning")
-                .replace("Ml", "ML")
-                .replace("Nlp", "NLP")
-                .replace("Mlops", "MLOps")
-            )
-            if (
-                line.startswith("1.")
-                or line.startswith("2.")
-                or line.startswith("3.")
-                or line.startswith("4.")
-            ):
-                st.markdown(f"**{line}**")
-            elif line.startswith("•") or line[0].isdigit():
-                st.markdown(f"- {line}")
+
+        # Safely extract feedback
+        raw_feedback = result.get("ai_feedback") or result.get("feedback", None)
+
+        if not raw_feedback:
+            st.warning("⚠️ No AI feedback received from backend.")
+        else:
+            # Case 1: Feedback is a string
+            if isinstance(raw_feedback, str):
+                feedback_text = raw_feedback.strip()
+                if not feedback_text:
+                    st.warning("⚠️ AI feedback is empty.")
+                else:
+                    # Clean common OCR/capitalization issues
+                    feedback_text = (
+                        feedback_text.replace("Doveloped", "Developed")
+                        .replace("DeveLoped", "Developed")
+                        .replace("Leaming", "Learning")
+                        .replace("Ml", "ML")
+                        .replace("Nlp", "NLP")
+                        .replace("Mlops", "MLOps")
+                    )
+                    for line in feedback_text.split("\n"):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith(("1.", "2.", "3.", "4.")):
+                            st.markdown(f"**{line}**")
+                        elif line.startswith("•") or line[0].isdigit():
+                            st.markdown(f"- {line}")
+                        else:
+                            st.markdown(f"{line}")
+
+            # Case 2: Feedback is a dict (structured)
+            elif isinstance(raw_feedback, dict):
+                st.info("🔍 Feedback received in structured format.")
+
+                # Extract missing skills
+                missing_skills = raw_feedback.get("missing_required_skills", "")
+                if missing_skills:
+                    st.markdown("### ⚠️ Missing Skills")
+                    st.markdown(f"- {', '.join(missing_skills.split(', '))}")
+
+                # Extract underemphasized skills
+                underemphasized = raw_feedback.get("underemphasized_skills", "")
+                if underemphasized:
+                    st.markdown("### 🔄 Underemphasized Skills")
+                    st.markdown(f"- {', '.join(underemphasized.split(', '))}")
+
+                # Extract suggested bullets
+                bullets = raw_feedback.get("suggested_bullet_points", [])
+                if bullets:
+                    st.markdown("### ✅ Suggested Bullet Points")
+                    for bullet in bullets:
+                        st.markdown(f"- {bullet}")
+
+                # Fallback: show full JSON if no keys found
+                if not any([missing_skills, underemphasized, bullets]):
+                    st.json(raw_feedback)
+
+            else:
+                st.json(raw_feedback)  # fallback for unknown types
 
         # Debug: View parsed data
         with st.expander("🔍 View Parsed Resume (Debug)"):
