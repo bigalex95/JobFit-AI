@@ -13,6 +13,7 @@ from utils.pdf_parser import extract_text_from_pdf
 from utils.llm_resume_parser import parse_resume_with_llm
 from utils.llm_jd_parser import parse_jd_with_llm
 from utils.llm_matcher import run_llm_match
+from utils.bullet_rewriter import rewrite_bullet_point
 
 # Initialize FastAPI
 app = FastAPI(title="JobFit AI - LLM Enhanced Backend")
@@ -112,3 +113,15 @@ async def match(jd_text: Annotated[str, Form()], resume_file: UploadFile = File(
         "ai_feedback": match_result["feedback"],
         "overall_score": match_percentage,
     }
+
+
+@app.post("/rewrite-bullet")
+async def api_rewrite_bullet(
+    bullet: Annotated[str, Form()],
+    jd_text: Annotated[str, Form()] = "",
+    resume_text: Annotated[str, Form()] = "",
+):
+    result = rewrite_bullet_point(
+        bullet=bullet, job_description=jd_text, resume_context=resume_text
+    )
+    return result

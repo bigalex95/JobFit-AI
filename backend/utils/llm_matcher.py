@@ -37,7 +37,13 @@ def run_llm_match(resume_data: dict, jd_data: dict) -> dict:
     )
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.2,
+            },
+        )
         return {"success": True, "feedback": response.text.strip()}
     except Exception as e:
         return {"success": False, "error": str(e)}

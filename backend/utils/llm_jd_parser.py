@@ -32,7 +32,13 @@ def parse_jd_with_llm(jd_text: str) -> dict:
     )
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.2,
+            },
+        )
         text = response.text.strip()
 
         if text.startswith("```json"):

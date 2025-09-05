@@ -12,7 +12,7 @@ def generate_resume_suggestions(
     """
     Ask Gemini to suggest how to improve the resume
     """
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     prompt = f"""
     You are a senior career coach helping a Machine Learning Scientist optimize their resume for a competitive role.
@@ -44,7 +44,13 @@ def generate_resume_suggestions(
     """
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.2,
+            },
+        )
         return response.text.strip()
     except Exception as e:
         return f"AI suggestion failed: {str(e)}"

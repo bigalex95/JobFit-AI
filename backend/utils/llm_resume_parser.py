@@ -32,7 +32,13 @@ def parse_resume_with_llm(resume_text: str) -> dict:
     )  # Limit length
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.2,
+            },
+        )
         text = response.text.strip()
 
         # Clean up code block if present
