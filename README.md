@@ -1,121 +1,89 @@
-# JobFit AI – Smart Resume-to-Job Matcher
+# JobFit AI
 
-🎯 A next-gen ATS assistant that helps job seekers beat the resume screening process using **AI-powered parsing and matching**.
+Resume-to-job-description matcher. Upload a resume PDF, paste a job description, and get LLM-generated gap feedback, suggested bullet points and a heuristic match score. Prototype built with Streamlit, FastAPI and Google Gemini.
 
-No more guessing — JobFit AI tells you:
+<!-- TODO: screenshot of the Streamlit UI (JD + resume upload and result) -->
 
-- ✅ Which skills to highlight
-- ⚠️ What’s missing from your resume
-- 💡 How to rephrase bullets for ATS
-- 📊 Your real match score (70–90%, not inflated)
+![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-Powered by **Google Gemini 2.5 Flash** and modern NLP.
+## Features
 
----
+- Extracts text from a PDF resume (`pdfplumber`).
+- Parses the resume and the job description into structured JSON with Gemini 2.5 Flash.
+- Compares the two with an LLM prompt and returns: whether the experience requirement is met, missing required skills, under-emphasized skills, and suggested bullet points to add.
+- Rewrites a weak resume bullet on request.
+- Streamlit frontend talking to a FastAPI backend.
 
-## 🚀 Features
+## How it works
 
-| Feature                         | Description                                                |
-| ------------------------------- | ---------------------------------------------------------- |
-| 📄 **Resume Parsing**           | Extracts skills, experience, education from PDF using LLMs |
-| 📋 **Job Description Analysis** | Parses requirements with context-aware LLM parsing         |
-| 🔍 **Smart Matching**           | Semantic comparison, not keyword counting                  |
-| 💬 **AI Suggestions**           | Generates ATS-friendly bullet points to add                |
-| 🔤 **AI Bullet Rewriter**       | Improve weak bullets with context-aware rewriting          |
-| 🌐 **Web UI**                   | Streamlit frontend + FastAPI backend                       |
-| 🐳 **Docker Ready**             | Containerized for easy deployment                          |
+```mermaid
+flowchart LR
+  UI[Streamlit UI] -->|JD text + resume PDF| API[FastAPI /match]
+  API --> P[pdfplumber text]
+  P --> R[Gemini: parse resume]
+  API --> J[Gemini: parse JD]
+  R --> M[Gemini: match and feedback]
+  J --> M
+  M --> S[Heuristic score]
+  S --> UI
+```
 
----
+Endpoints in `backend/main.py`: `POST /parse-resume`, `POST /parse-jd`, `POST /match`, `POST /rewrite-bullet`. The LLM calls live in `backend/utils/llm_*.py`, `bullet_rewriter.py` and `ai_suggestions.py`.
 
-## 🛠️ Tech Stack
+The overall score in `backend/utils/score_calculator.py` is a rule-based heuristic: a base of 70, adjusted by whether the years-of-experience requirement is met and by keywords such as "missing" or "not found" in the LLM feedback. It is not a validated or calibrated measure of fit.
 
-- **Frontend**: Streamlit (Python)
-- **Backend**: FastAPI
-- **LLM**: Google Gemini 2.5 Flash
-- **PDF Parsing**: `pdfplumber`
-- **DevOps**: Docker, GitHub Actions
-- **Database**: SQLite (MVP), PostgreSQL (future)
+## Tech stack
 
----
+Python 3.11, Streamlit, FastAPI, Uvicorn, pdfplumber, Google Gemini 2.5 Flash (`google-generativeai`).
 
-## 🚀 Quick Start
+## Getting started
 
-### 1. Set up environment
+Prerequisites: Python 3.11 and a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
+export GEMINI_API_KEY="<your key>"
 
-### 2. Get Gemini API Key
+# terminal 1: backend (the frontend expects http://127.0.0.1:8000)
+uvicorn backend.main:app --reload --port 8000
 
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Create API key
-3. Export it:
-
-```bash
-export GEMINI_API_KEY="your_key_here"
-```
-
-### 3. Run Backend
-
-```bash
-uvicorn backend.main:app --reload --port=8000
-```
-
-### 4. Run Frontend
-
-```bash
+# terminal 2: frontend
 streamlit run frontend/app.py
 ```
 
-👉 Open http://localhost:8501
+Open http://localhost:8501, paste a job description, upload a PDF resume and press "Analyze Fit". Uploaded resumes are saved under `data/resumes/` on the backend host.
 
----
+Environment variable: `GEMINI_API_KEY` (required).
 
-## 🧪 Example Use Case
+## Project structure
 
-**Job**: Senior ML Scientist (5+ years, PyTorch, NLP, MLOps)  
-**Resume**: Alibek Erkabayev (10+ years, Python, TensorFlow, AWS)  
-**Output**:
+```
+backend/main.py          FastAPI app and /match pipeline
+backend/utils/           PDF extraction, Gemini parsers/matcher/rewriter, score heuristic
+frontend/app.py          Streamlit UI
+requirements.txt         dependencies
+Dockerfile, docker-compose.yml  see limitations
+```
 
-- Match Score: 70%
-- Feedback: "Add fine-tuning (LoRA, QLoRA), anomaly detection"
-- Suggestions: "Fine-tuned LLMs using LoRA for efficient deployment..."
+## Limitations
 
----
+- Output quality depends entirely on the LLM prompts; no evaluation against labeled data has been done.
+- The score is a heuristic over LLM text (see above) and can disagree with the feedback.
+- The resume and job description are sent to the Gemini API; do not use confidential documents you cannot share.
+- No automated tests and no CI.
+- The Dockerfile and `docker-compose.yml` copy from a `jobfit-ai/` subdirectory that does not exist in this repository, so they do not build as-is. Run from source instead.
+- `requirements.txt` includes heavy packages (torch, spaCy, sentence-transformers) used only by legacy modules (`backend/utils/matcher.py`, `jd_parser.py`) that the API does not call.
+- Not every Gemini call is configured in one place; each util module configures the client itself.
 
-## 🐞 Known Issues
+## Roadmap
 
-| Issue                                                          | Status            |
-| -------------------------------------------------------------- | ----------------- |
-| 🔢 Match score calculation may not reflect structured feedback | **Next Priority** |
+- Export an optimized resume.
+- Persistent storage (currently none; no database).
+- Mocked-LLM unit tests and CI.
+- Fix the Docker setup and trim unused dependencies.
 
----
+## License
 
-## 🌐 Roadmap
-
-| Feature                     | Status  |
-| --------------------------- | ------- |
-| 🔤 AI Bullet Rewriter       | Done    |
-| 📤 Export Optimized Resume  | Next    |
-| 🧩 Chrome Extension         | Planned |
-| ☁️ Deploy to Railway/Render | Future  |
-
----
-
-## 🤝 Contributing
-
-PRs welcome! Just:
-
-1. Create a feature branch
-2. Add tests if possible
-3. Submit PR to `main`
-
----
-
-## 📄 License
-
-MIT
+MIT, see [LICENSE](LICENSE).
